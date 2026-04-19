@@ -12,6 +12,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { requestContext } from "../lib/session-state.js"
 import { maskSensitiveUrl } from "../lib/fetch-with-retry.js"
 import { VERSION } from "../version.js"
+import { registerRestWrapper } from "./rest-wrapper.js"
 
 /**
  * 에러 메시지에서 민감 정보(API 키 포함 URL) scrub.
@@ -97,6 +98,8 @@ export async function startHTTPServer(createServer: () => Server, port: number) 
     next()
   })
 
+  registerRestWrapper(app)
+
   // 헬스체크 엔드포인트
   app.get("/", (req, res) => {
     res.json({
@@ -107,6 +110,8 @@ export async function startHTTPServer(createServer: () => Server, port: number) 
       endpoints: {
         mcp: "/mcp",
         health: "/health",
+        restSearch: "/api/legal-search-plan",
+        restVerify: "/api/verify-citations",
       },
       tools: {
         exposed: 16,
