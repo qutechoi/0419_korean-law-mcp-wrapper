@@ -47,6 +47,21 @@ export async function fetchWithRetry(
 
   let lastError: Error | null = null
 
+  // 법제처 Open API는 OC + 등록된 도메인(Referer) 조합으로 사용자 검증.
+  // LAW_API_REFERER 환경변수가 있으면 law.go.kr 호출 시 자동 주입.
+  const refererDomain = process.env.LAW_API_REFERER
+  let mergedHeaders = fetchOptions.headers
+  if (refererDomain) {
+    try {
+      if (/(?:^|\.)law\.go\.kr$/i.test(new URL(url).hostname)) {
+        mergedHeaders = {
+          ...(fetchOptions.headers as Record<string, string> | undefined),
+          Referer: refererDomain,
+        }
+      }
+    } catch { /* invalid URL — fall through to fetch which will reject */ }
+  }
+
   for (let attempt = 0; attempt <= retries; attempt++) {
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), timeout)
@@ -54,6 +69,7 @@ export async function fetchWithRetry(
     try {
       const response = await fetch(url, {
         ...fetchOptions,
+        headers: mergedHeaders,
         signal: controller.signal,
       })
 
