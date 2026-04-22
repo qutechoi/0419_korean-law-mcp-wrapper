@@ -5,6 +5,7 @@
 import { normalizeLawSearchText, resolveLawAlias } from "./search-normalizer.js"
 import { fetchWithRetry } from "./fetch-with-retry.js"
 import { requestContext } from "./session-state.js"
+import { jsonToXmlString, looksLikeJson } from "./json-to-xml.js"
 
 const LAW_API_BASE = "https://www.law.go.kr/DRF"
 
@@ -49,6 +50,19 @@ export class LawApiClient {
     return t === "JSON" ? "JSON" : "XML"
   }
 
+  /**
+   * 응답 정규화 — 법제처 XML 엔드포인트가 장애 상태일 때
+   * LAW_RESPONSE_TYPE=JSON으로 받은 JSON 응답을 XML 문자열로 변환하여
+   * 기존 XML 파서 기반 도구(search.ts, comparison.ts 등)와 호환 유지.
+   * XML 응답이거나 환경변수가 XML이면 원본 그대로 반환.
+   */
+  private normalizeResponse(text: string): string {
+    if (this.getResponseType() === "JSON" && looksLikeJson(text)) {
+      return jsonToXmlString(text)
+    }
+    return text
+  }
+
   /** 응답 본문이 HTML 에러 페이지인지 확인 */
   private checkHtmlError(text: string, context: string): void {
     if (text.includes("<!DOCTYPE html") || text.includes("<html")) {
@@ -80,7 +94,7 @@ export class LawApiClient {
     const response = await fetchWithRetry(url)
     await this.throwIfError(response, "searchLaw")
 
-    return await response.text()
+    return this.normalizeResponse(await response.text())
   }
 
   /**
@@ -142,7 +156,7 @@ export class LawApiClient {
     const response = await fetchWithRetry(url)
     await this.throwIfError(response, "compareOldNew")
 
-    return await response.text()
+    return this.normalizeResponse(await response.text())
   }
 
   /**
@@ -192,7 +206,7 @@ export class LawApiClient {
     const response = await fetchWithRetry(url)
     await this.throwIfError(response, "searchAdminRule")
 
-    return await response.text()
+    return this.normalizeResponse(await response.text())
   }
 
   /**
@@ -213,7 +227,7 @@ export class LawApiClient {
     const text = await response.text()
     this.checkHtmlError(text, "행정규칙을 찾을 수 없습니다. ID를 확인해주세요")
 
-    return text
+    return this.normalizeResponse(text)
   }
 
   /**
@@ -299,7 +313,7 @@ export class LawApiClient {
     const response = await fetchWithRetry(url)
     await this.throwIfError(response, "searchOrdinance")
 
-    return await response.text()
+    return this.normalizeResponse(await response.text())
   }
 
   /**
@@ -355,7 +369,7 @@ export class LawApiClient {
     const response = await fetchWithRetry(url)
     await this.throwIfError(response, "getArticleHistory")
 
-    return await response.text()
+    return this.normalizeResponse(await response.text())
   }
 
   /**
@@ -416,6 +430,6 @@ export class LawApiClient {
     const response = await fetchWithRetry(url)
     await this.throwIfError(response, "getLawHistory")
 
-    return await response.text()
+    return this.normalizeResponse(await response.text())
   }
 }
